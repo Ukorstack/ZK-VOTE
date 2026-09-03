@@ -4,15 +4,11 @@ include "node_modules/circomlib/circuits/poseidon.circom";
 include "node_modules/circomlib/circuits/comparators.circom";
 include "merkle_tree.circom";
 
-// DAO domain separation tag for commitment scheme
-// SHA-256("ZK-VOTE-COMMITMENT") reduced mod BN254 scalar field
-// Prevents cross-protocol attacks where commitments from other systems
-// could be valid in ZK-VOTE
-
 // DaoVote Anonymous Comment Circuit v2
 //
-// Adds parentCommentId as a public signal for proper threading support.
-// Upgraded from v1 which had 6 public signals.
+// Adds parentCommentId as a public signal for proper threading support while
+// preserving the same DOMAIN_TAG + blinding factor commitment scheme as the
+// v1 comment circuit.
 //
 // Public signals: [root, nullifier, daoId, proposalId, commentNonce, commitment, parentCommentId]
 // Private signals: secret, salt, blindingFactor, pathElements, pathIndices
@@ -33,15 +29,13 @@ template CommentV2(levels) {
 
     // Private inputs
     signal input secret;            // Commenter's secret (like password)
-    signal input salt;              // Salt for commitment
+    signal input salt;              // Random salt for commitment
     signal input blindingFactor;    // Random blinding factor for uniform distribution
     signal input pathElements[levels];  // Merkle proof siblings
     signal input pathIndices[levels];   // Merkle proof path (0=left, 1=right)
 
     // 1. Compute identity commitment: Poseidon(DOMAIN_TAG, secret, salt, blindingFactor)
-    // and verify it matches the public commitment input
-    // Domain-separated commitment prevents cross-protocol attacks.
-    // Blinding factor ensures uniform distribution across the field.
+    // and verify it matches the public commitment input.
     component commitmentHasher = Poseidon(4);
     commitmentHasher.inputs[0] <== DOMAIN_TAG;
     commitmentHasher.inputs[1] <== secret;
@@ -71,5 +65,4 @@ template CommentV2(levels) {
 }
 
 // Default tree depth of 18 (supports ~262K members)
-// Public signals: [root, nullifier, daoId, proposalId, commentNonce, commitment, parentCommentId] - 7 signals
 component main {public [root, nullifier, daoId, proposalId, commentNonce, commitment, parentCommentId]} = CommentV2(18);
